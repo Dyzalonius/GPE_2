@@ -5,17 +5,32 @@ using Utils;
 
 public class LevelGenerator : MonoBehaviour
 {
-    [Header("Settings")]
-    [SerializeField]
-    private Vector2Int gridSize;
-
+    [Header("Grid settings")]
     [SerializeField]
     [Range(0, 20)]
     private int splitCount;
 
     [SerializeField]
     [Range(0f, 0.5f)]
-    private float minSplitPercentage;
+    private float minSplitPercentage; // Known issue: splitPercentage can be lower than the minRoomSize and larger than the maxRoomSize
+
+    [SerializeField]
+    private Vector2Int gridSize;
+
+    [Header("Room size settings")]
+    [SerializeField]
+    public int MinRoomSizeFlat;
+
+    [SerializeField]
+    public int MaxRoomSizeFlat;
+
+    [SerializeField]
+    [Range(0f, 1f)]
+    public float MinRoomSizePercentage;
+
+    [SerializeField]
+    [Range(0f, 1f)]
+    public float MaxRoomSizePercentage;
 
     [HideInInspector]
     public static LevelGenerator Instance;
@@ -34,6 +49,13 @@ public class LevelGenerator : MonoBehaviour
 
     private void Update()
     {
+        if (MinRoomSizeFlat < 1)
+            MinRoomSizeFlat = 1;
+        if (MaxRoomSizeFlat < MinRoomSizeFlat)
+            MaxRoomSizeFlat = MinRoomSizeFlat;
+        if (MaxRoomSizePercentage < MinRoomSizePercentage)
+            MaxRoomSizePercentage = MinRoomSizePercentage;
+
         if (Input.GetKeyDown(KeyCode.G))
             GenerateLevel();
     }
@@ -43,57 +65,46 @@ public class LevelGenerator : MonoBehaviour
         ResetLevel();
 
         Grid = new TileType[gridSize.x, gridSize.y];
-        SetBlock(0, 0, gridSize.x, gridSize.y, TileType.Wall);
+        SetBlock(Vector2Int.zero, gridSize, TileType.Wall);
 
         Node root = new Node(0, 0, gridSize.x, gridSize.y);
         root.Split(splitCount, minSplitPercentage);
         root.Draw();
-
-        /*SetBlock(26, 26, 12, 12, TileType.Empty);
-        SetBlock(30, 30, 1, 1, TileType.Dagger);
-        SetBlock(34, 30, 1, 1, TileType.Key);
-        SetBlock(32, 32, 1, 1, TileType.Door);
-        SetBlock(32, 36, 1, 1, TileType.Enemy);
-        SetBlock(32, 34, 1, 1, TileType.End);*/
-        SetBlock(32, 28, 1, 1, TileType.Player);
-        //Debugger.instance.AddLabel(32, 26, "Room 1");
+        
+        SetBlock(new Vector2Int(32, 28), Vector2Int.one, TileType.Player);
 
         CreateLevel();
     }
 
-    public void SetBlock(int x, int y, int width, int height, TileType fillType)
+    public void SetBlock(Vector2Int pos, Vector2Int size, TileType fillType)
     {
-        for (int tileY = 0; tileY < height; tileY++)
-        {
-            for (int tileX = 0; tileX < width; tileX++)
-            {
-                SetTile(x + tileX, y + tileY, fillType);
-            }
-        }
+        for (int i = 0; i < size.y; i++)
+            for (int j = 0; j < size.x; j++)
+                SetTile(new Vector2Int(pos.x + j, pos.y + i), fillType);
     }
 
-    private void SetTile(int x, int y, TileType fillType)
+    private void SetTile(Vector2Int pos, TileType fillType)
     {
         // Check bounds
-        if (x < 0) return;
-        if (y < 0) return;
-        if (x >= Grid.GetLength(1)) return;
-        if (y >= Grid.GetLength(0)) return;
+        if (pos.x < 0) return;
+        if (pos.y < 0) return;
+        if (pos.x >= Grid.GetLength(1)) return;
+        if (pos.y >= Grid.GetLength(0)) return;
 
-        Grid[y, x] = fillType;
+        Grid[pos.y, pos.x] = fillType;
     }
 
     private void CreateLevel() {
         int height = Grid.GetLength(0);
         int width = Grid.GetLength(1);
-        for (int y=0; y<height; y++) {
-            for (int x=0; x<width; x++) {
+
+        for (int y = 0; y < height; y++)
+            for (int x = 0; x < width; x++)
+            {
                  TileType tile = Grid[y, x];
-                 if (tile != TileType.Empty) {
+                 if (tile != TileType.Empty)
                      CreateTile(x, y, tile);
-                 }
             }
-        }
     }
 
     private GameObject CreateTile(int x, int y, TileType type) {

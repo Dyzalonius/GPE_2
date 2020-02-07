@@ -13,7 +13,7 @@ namespace InGame {
 
         protected abstract void HandleControls();
 
-        protected virtual void Update()
+        protected virtual void FixedUpdate()
         {
             HandleControls();
         }

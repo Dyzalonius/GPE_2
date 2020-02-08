@@ -1,7 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using Utils;
+using System.Linq;
 
 public class Node
 {
@@ -9,6 +9,7 @@ public class Node
     private Vector2Int size;
     private Node[] children = new Node[2];
     private bool hasChildren = false;
+    private Room room;
     
     public Node(int x, int y, int width, int height)
     {
@@ -22,7 +23,10 @@ public class Node
     {
         // Exit if no more splits left
         if (splitCount <= 0)
+        {
+            room = new Room(pos, size);
             return;
+        }
         else
             splitCount--;
 
@@ -52,6 +56,38 @@ public class Node
         children[1].Split(splitCount, minSplitPercentage);
     }
 
+    public List<Room> GetRooms()
+    {
+        List<Room> rooms = new List<Room>();
+
+        if (hasChildren)
+        {
+            rooms.AddRange(children[0].GetRooms());
+            rooms.AddRange(children[1].GetRooms());
+        }
+        else
+            rooms.Add(room);
+
+        return rooms;
+    }
+
+    public void ConnectChildren()
+    {
+        List<Room> rooms1 = children[0].GetRooms();
+        List<Room> rooms2 = children[1].GetRooms();
+
+        Room randomRoom = rooms2[Random.Range(0, rooms2.Count - 1)];
+        Room closestRoom1 = rooms1.OrderBy(x => Vector2Int.Distance(x.CenterPos, randomRoom.CenterPos)).ToArray()[0];
+        Room closestRoom2 = rooms2.OrderBy(x => Vector2Int.Distance(x.CenterPos, closestRoom1.CenterPos)).ToArray()[0];
+        closestRoom1.CreateCorridor(closestRoom2);
+
+        if (children[0].hasChildren)
+        {
+            children[0].ConnectChildren();
+            children[1].ConnectChildren();
+        }
+    }
+
     public void Draw()
     {
         if (hasChildren)
@@ -61,30 +97,7 @@ public class Node
         }
         else
         {
-            Vector2 minRoomSize = new Vector2
-            {
-                x = Mathf.Clamp(LevelGenerator.Instance.MinRoomSizePercentage * size.x, LevelGenerator.Instance.MinRoomSizeFlat, size.x - 2f),
-                y = Mathf.Clamp(LevelGenerator.Instance.MinRoomSizePercentage * size.y, LevelGenerator.Instance.MinRoomSizeFlat, size.y - 2f)
-            };
-            Vector2 maxRoomSize = new Vector2
-            {
-                x = Mathf.Clamp(LevelGenerator.Instance.MaxRoomSizePercentage * size.x, minRoomSize.x, Mathf.Min(LevelGenerator.Instance.MaxRoomSizeFlat, size.x - 2f)),
-                y = Mathf.Clamp(LevelGenerator.Instance.MaxRoomSizePercentage * size.y, minRoomSize.y, Mathf.Min(LevelGenerator.Instance.MaxRoomSizeFlat, size.y - 2f))
-            };
-            Vector2Int roomSize = new Vector2Int
-            {
-                x = Mathf.RoundToInt(Random.Range(minRoomSize.x, maxRoomSize.x)),
-                y = Mathf.RoundToInt(Random.Range(minRoomSize.y, maxRoomSize.y))
-            };
-            Vector2Int roomPos = new Vector2Int
-            {
-                x = pos.x + Mathf.RoundToInt(Random.Range(1f, size.x - roomSize.x - 1)),
-                y = pos.y + Mathf.RoundToInt(Random.Range(1f, size.y - roomSize.y - 1))
-            };
-
-            LevelGenerator.Instance.SetBlock(pos, size, TileType.Wall);
-            LevelGenerator.Instance.SetBlock(roomPos, roomSize, TileType.Empty);
-            Debugger.instance.AddLabel(pos.x + size.x / 2, pos.y + size.y / 2, "ThisIsANode");
+            room.Draw();
         }
     }
 }

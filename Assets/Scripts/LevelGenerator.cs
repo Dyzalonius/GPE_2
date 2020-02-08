@@ -41,6 +41,9 @@ public class LevelGenerator : MonoBehaviour
     [HideInInspector]
     public TileType[,] Grid;
 
+    [HideInInspector]
+    public int roomIndex;
+
     private void Start()
     {
         Instance = this;
@@ -64,14 +67,57 @@ public class LevelGenerator : MonoBehaviour
     {
         ResetLevel();
 
+        // Generate
         Grid = new TileType[gridSize.x, gridSize.y];
-        SetBlock(Vector2Int.zero, gridSize, TileType.Wall);
-
         Node root = new Node(0, 0, gridSize.x, gridSize.y);
         root.Split(splitCount, minSplitPercentage);
-        root.Draw();
+        root.ConnectChildren();
+        List<Room> rooms = root.GetRooms();
+        List<Room> leafRooms = rooms.FindAll(x => x.ConnectedRooms.Count == 1);
+        int leafCount = leafRooms.Count;
         
-        SetBlock(new Vector2Int(32, 28), Vector2Int.one, TileType.Player);
+        // Pick locations
+        Room startRoom = leafRooms[Random.Range(0, leafRooms.Count)];
+        leafRooms.Remove(startRoom);
+        rooms.Remove(startRoom);
+
+        Room endRoom = leafRooms[Random.Range(0, leafRooms.Count)];
+        leafRooms.Remove(endRoom);
+        rooms.Remove(endRoom);
+
+        Room daggerRoom = rooms[Random.Range(0, rooms.Count)];
+        leafRooms.Remove(daggerRoom);
+        rooms.Remove(daggerRoom);
+
+        Room keyRoom = rooms[Random.Range(0, rooms.Count)];
+        leafRooms.Remove(keyRoom);
+        rooms.Remove(keyRoom);
+
+        Room enemyRoom = rooms[Random.Range(0, rooms.Count)];
+        leafRooms.Remove(enemyRoom);
+        rooms.Remove(enemyRoom);
+
+        // Draw locations
+        SetBlock(Vector2Int.zero, gridSize, TileType.Wall);
+        root.Draw();
+        SetBlock(startRoom.CenterPos, Vector2Int.one, TileType.Player);
+        SetBlock(endRoom.CenterPos, Vector2Int.one, TileType.End);
+        SetBlock(daggerRoom.CenterPos, Vector2Int.one, TileType.Dagger);
+        SetBlock(keyRoom.CenterPos, Vector2Int.one, TileType.Key);
+        SetBlock(enemyRoom.CenterPos, Vector2Int.one, TileType.Enemy);
+        
+        // Wait to make sure the doorpieces are not placed on other tiles
+        CreateLevel();
+
+        List<Vector2Int> doorPieces = new List<Vector2Int>();
+        for (int i = endRoom.Pos.x - 1; i < endRoom.Pos.x + endRoom.Size.x + 1; i++)
+            for (int j = endRoom.Pos.y - 1; j < endRoom.Pos.y + endRoom.Size.y + 1; j++)
+            {
+                if (i < 0 || j < 0 || i >= Grid.GetLength(1) || j >= Grid.GetLength(0)) continue;
+                if ((i == endRoom.Pos.x - 1 || i == endRoom.Pos.x + endRoom.Size.x || j == endRoom.Pos.y - 1 || j == endRoom.Pos.y + endRoom.Size.y))
+                    doorPieces.Add(new Vector2Int(i, j));
+            }
+        doorPieces.ForEach(x => SetBlock(x, Vector2Int.one, TileType.Door));
 
         CreateLevel();
     }
@@ -81,6 +127,13 @@ public class LevelGenerator : MonoBehaviour
         for (int i = 0; i < size.y; i++)
             for (int j = 0; j < size.x; j++)
                 SetTile(new Vector2Int(pos.x + j, pos.y + i), fillType);
+    }
+
+    public void SetBlockWithCorners(Vector2Int pos1, Vector2Int pos2, TileType fillType)
+    {
+        Vector2Int bottomLeft = new Vector2Int(Mathf.Min(pos1.x, pos2.x), Mathf.Min(pos1.y, pos2.y));
+        Vector2Int topRight = new Vector2Int(Mathf.Max(pos1.x, pos2.x), Mathf.Max(pos1.y, pos2.y));
+        SetBlock(bottomLeft, topRight - bottomLeft + Vector2Int.one, fillType);
     }
 
     private void SetTile(Vector2Int pos, TileType fillType)
@@ -127,6 +180,8 @@ public class LevelGenerator : MonoBehaviour
 
     private void ResetLevel()
     {
+        roomIndex = 0;
+
         for (int i = 0; i < transform.childCount; i++)
             Destroy(transform.GetChild(i).gameObject);
 
